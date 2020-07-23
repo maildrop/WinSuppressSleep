@@ -58,10 +58,8 @@ namespace traceer{
   {
     wchar_t buf[512] = {0};
     do{
-      _swprintf_s( buf ,_TRUNCATE, fmt , std::forward<Args...>( args )... );
-      wcscat_s( buf , line );
-      OutputDebugStringW( buf );
-                                  
+      _snwprintf_s( buf ,_TRUNCATE, fmt , std::forward<Args...>( args )... );
+      traceer( line , buf );
     }while( false );
     return 0;
   }
