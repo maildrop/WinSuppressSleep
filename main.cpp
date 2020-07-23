@@ -52,8 +52,10 @@ static BOOL AddNotificationIcon( HWND hWnd )
   nid.cbSize = sizeof( nid );
   nid.hWnd = hWnd;
   nid.uID = 0;
-  nid.uFlags = NIF_GUID | NIF_ICON | NIF_MESSAGE  ;
-  assert( S_OK == LoadIconMetric( GetModuleHandle( NULL ),MAKEINTRESOURCE( IDI_THREADEXEC ) , LIM_SMALL, &nid.hIcon ) );
+  nid.uFlags = NIF_GUID | NIF_MESSAGE  ;
+  if( S_OK == LoadIconMetric( GetModuleHandle( NULL ),MAKEINTRESOURCE( IDI_THREADEXEC ) , LIM_SMALL, &nid.hIcon ) ){
+    nid.uFlags |= NIF_ICON;
+  }
   nid.uCallbackMessage = PWM_TASKTRAY;
   nid.guidItem = __uuidof( ShellTasktrayIcon );
   if( Shell_NotifyIcon(NIM_ADD, &nid) ){
@@ -124,14 +126,13 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
     break;
   case PWM_INIT:
     {
-      OutputDebugString(TEXT("PWM_INIT\n"));
+      TRACEER( TEXT("PWM_INIT") );
       PostMessage( hWnd , PWM_SUPPRESS_SUSPEND , 0 , 0 );
-      
     }
     return 1;
   case PWM_SUPPRESS_SUSPEND:
     {
-      OutputDebugString(TEXT("PWM_SUPPRESS_SUSPEND\n"));
+      TRACEER( TEXT("PWM_SUPPRESS_SUSPEND"));
       if( ! SetThreadExecutionState( ES_AWAYMODE_REQUIRED | ES_CONTINUOUS) ){
         MessageBox( hWnd, TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
       }
@@ -139,7 +140,7 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
     return 0;
   case PWM_SUPPRESS_SCREENSAVER:
     {
-      OutputDebugString(TEXT("PWM_SUPPRESS_SCREENSAVER\n"));
+      TRACEER( TEXT("PWM_SUPPRESS_SCREENSAVER") );
       if( ! SetThreadExecutionState( ES_DISPLAY_REQUIRED | ES_CONTINUOUS )){
         MessageBox( hWnd, TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
       }
@@ -147,7 +148,7 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
     return 0;
   case PWM_SHUTDOWN:
     {
-      OutputDebugString(TEXT("PWM_SHUTDOWN\n"));
+      TRACEER( TEXT("PWM_SHUTDOWN") );
       if( ! SetThreadExecutionState( ES_CONTINUOUS ) ){
         MessageBox( hWnd, TEXT("失敗" ), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
       }
@@ -155,7 +156,7 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
     return 0;
   case PWM_TASKTRAY:
     {
-      OutputDebugString( TEXT("PWM_TASKTRAY") );
+      TRACEER( TEXT("PWM_TASKTRAY %d") , LOWORD(lParam) );
       switch( LOWORD( lParam ) ){
       case WM_CONTEXTMENU:
         {
@@ -171,14 +172,13 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
     
   case WM_CREATE:
     {
-      OutputDebugString(TEXT("WM_CREATE\n"));
+      TRACEER( TEXT("WM_CREATE"));
       if( lParam ){
         const CREATESTRUCT* createStruct = reinterpret_cast<CREATESTRUCT*>( lParam );
         assert( createStruct );
         if( createStruct->lpCreateParams ){
           const CreateWindowArgument* arg = reinterpret_cast<CreateWindowArgument*>(createStruct->lpCreateParams);
           if( arg ){
-            OutputDebugString( TEXT("OK") );
             VERIFY( AddNotificationIcon( hWnd ) );
           }
         }
