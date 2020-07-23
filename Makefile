@@ -11,7 +11,7 @@ clean_TAREGET=$(threadexec_OBJS) threadexec.exe threadexec.ilk threadexec.pdb
 threadexec.exe: main.obj threadexec.res
 	$(LINK) $(LINKFLAGS) /OUT:$@ $**
 
-main.obj: main.cpp Resource.h
+main.obj: main.cpp Resource.h traceer.h
 	$(CXX) -c $(CXXFLAGS) -Fo:$@ $*.cpp
 
 threadexec.res: threadexec.rc

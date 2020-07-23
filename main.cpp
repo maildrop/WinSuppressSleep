@@ -9,6 +9,8 @@
 #include <shellapi.h>
 #include <commctrl.h>
 
+#include "traceer.h"
+
 #pragma comment(lib, "User32.lib" )
 #pragma comment(lib, "Gdi32.lib" )
 #pragma comment(lib, "Ole32.lib" )
@@ -20,14 +22,6 @@ version='6.0.0.0' \
 processorArchitecture='*' \
 publicKeyToken='6595b64144ccf1df' \
 language='*'\"")
-
-#if !defined( VERIFY )
-# if defined( NDEBUG )
-#  define VERIFY( exp ) (exp)
-# else
-#  define VERIFY( exp ) assert( (exp) )
-# endif /* defined( NDEBUG ) */
-#endif /* !defined( VERIFY ) */
 
 extern "C"{
   /* Private Window Messages */
@@ -54,17 +48,17 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam );
 static BOOL AddNotificationIcon( HWND hWnd )
 {
   // TODO: 複数回アプリを立ち上げると、Shellのアイコン管理が上手くいかなくなるのでどうにかする
-  NOTIFYICONDATA nId = { 0 };
-  nId.cbSize = sizeof( nId );
-  nId.hWnd = hWnd;
-  nId.uID = 0;
-  nId.uFlags = NIF_GUID | NIF_ICON | NIF_MESSAGE  ;
-  assert( S_OK == LoadIconMetric( GetModuleHandle( NULL ),MAKEINTRESOURCE( IDI_THREADEXEC ) , LIM_SMALL, &nId.hIcon ) );
-  nId.uCallbackMessage = PWM_TASKTRAY;
-  nId.guidItem = __uuidof( ShellTasktrayIcon );
-  if( Shell_NotifyIcon(NIM_ADD, &nId) ){
-    nId.uVersion = NOTIFYICON_VERSION_4;
-    return Shell_NotifyIcon(NIM_SETVERSION, &nId );
+  NOTIFYICONDATA nid = { 0 };
+  nid.cbSize = sizeof( nid );
+  nid.hWnd = hWnd;
+  nid.uID = 0;
+  nid.uFlags = NIF_GUID | NIF_ICON | NIF_MESSAGE  ;
+  assert( S_OK == LoadIconMetric( GetModuleHandle( NULL ),MAKEINTRESOURCE( IDI_THREADEXEC ) , LIM_SMALL, &nid.hIcon ) );
+  nid.uCallbackMessage = PWM_TASKTRAY;
+  nid.guidItem = __uuidof( ShellTasktrayIcon );
+  if( Shell_NotifyIcon(NIM_ADD, &nid) ){
+    nid.uVersion = NOTIFYICON_VERSION_4;
+    return Shell_NotifyIcon(NIM_SETVERSION, &nid );
   }else{
     return FALSE;
   }
@@ -72,7 +66,7 @@ static BOOL AddNotificationIcon( HWND hWnd )
 
 static BOOL DeleteNotificationIcon()
 {
-  NOTIFYICONDATA nid = {};
+  NOTIFYICONDATA nid = { 0 };
   nid.cbSize = sizeof( nid );
   nid.uID = 0;
   nid.uFlags = NIF_GUID;
@@ -138,7 +132,7 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
   case PWM_SUPPRESS_SUSPEND:
     {
       OutputDebugString(TEXT("PWM_SUPPRESS_SUSPEND\n"));
-      if( ! SetThreadExecutionState(ES_AWAYMODE_REQUIRED | ES_CONTINUOUS) ){
+      if( ! SetThreadExecutionState( ES_AWAYMODE_REQUIRED | ES_CONTINUOUS) ){
         MessageBox( hWnd, TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
       }
     }
@@ -162,7 +156,6 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
   case PWM_TASKTRAY:
     {
       OutputDebugString( TEXT("PWM_TASKTRAY") );
-      
       switch( LOWORD( lParam ) ){
       case WM_CONTEXTMENU:
         {
