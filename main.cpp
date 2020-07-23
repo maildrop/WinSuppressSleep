@@ -34,8 +34,8 @@ extern "C"{
   enum {
     PWM_TASKTRAY = (WM_APP + 1),
     PWM_INIT,
-    PWM_SUPRESS_SUSPEND,
-    PWM_SUPRESS_SCREENSAVER,
+    PWM_SUPPRESS_SUSPEND,
+    PWM_SUPPRESS_SCREENSAVER,
     PWM_SHUTDOWN,
     PWM_LAST
   };
@@ -53,54 +53,112 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam );
 
 static BOOL AddNotificationIcon( HWND hWnd )
 {
+  // TODO: 複数回アプリを立ち上げると、Shellのアイコン管理が上手くいかなくなるのでどうにかする
   NOTIFYICONDATA nId = { 0 };
   nId.cbSize = sizeof( nId );
   nId.hWnd = hWnd;
-  nId.uID = 0; // use guidItem
-  nId.uFlags = NIF_GUID | NIF_ICON /* | NIF_MESSAGE */ ;
+  nId.uID = 0;
+  nId.uFlags = NIF_GUID | NIF_ICON | NIF_MESSAGE  ;
   assert( S_OK == LoadIconMetric( GetModuleHandle( NULL ),MAKEINTRESOURCE( IDI_THREADEXEC ) , LIM_SMALL, &nId.hIcon ) );
   nId.uCallbackMessage = PWM_TASKTRAY;
   nId.guidItem = __uuidof( ShellTasktrayIcon );
-  Shell_NotifyIcon(NIM_ADD, &nId);
-
-  nId.uVersion = NOTIFYICON_VERSION_4;
-  return Shell_NotifyIcon(NIM_SETVERSION, &nId );
+  if( Shell_NotifyIcon(NIM_ADD, &nId) ){
+    nId.uVersion = NOTIFYICON_VERSION_4;
+    return Shell_NotifyIcon(NIM_SETVERSION, &nId );
+  }else{
+    return FALSE;
+  }
 }
 
 static BOOL DeleteNotificationIcon()
 {
   NOTIFYICONDATA nid = {};
   nid.cbSize = sizeof( nid );
+  nid.uID = 0;
   nid.uFlags = NIF_GUID;
   nid.guidItem = __uuidof( ShellTasktrayIcon );
   return Shell_NotifyIcon(NIM_DELETE, &nid );
 }
 
+
+static void ShowContextMenu( HINSTANCE hInstance, HWND hWnd ,const POINT& pt )
+{
+  HMENU hMenu = LoadMenu( hInstance , MAKEINTRESOURCE( IDC_CONTEXTMENU ) );
+  assert( hMenu );
+  if( hMenu ){
+    HMENU hSubMenu = GetSubMenu( hMenu , 0 );
+    assert( hSubMenu );
+    if( hSubMenu ){
+      //SetForegroundWindow(hWnd);
+      // respect menu drop alignment
+      UINT uFlags = TPM_RIGHTBUTTON;
+      if (GetSystemMetrics(SM_MENUDROPALIGNMENT) != 0){
+        uFlags |= TPM_RIGHTALIGN;
+      }else{
+        uFlags |= TPM_LEFTALIGN;
+      }
+      TrackPopupMenuEx(hSubMenu, uFlags, pt.x, pt.y, hWnd, NULL);      
+    }
+    DestroyMenu( hMenu );
+  }
+  return;
+}
+
+
 static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
 {
   switch( msg ){
+  case WM_PAINT:
+    {
+      PAINTSTRUCT ps = {0};
+      HDC hdc = ::BeginPaint( hWnd , &ps );
+      static_cast<void>( hdc );
+      ::EndPaint( hWnd , &ps );
+    }
+    return 0;
+  case WM_COMMAND:
+    {
+      const int wmId = LOWORD( wParam );
+      switch( wmId ){
+      case IDM_EXIT:
+        DestroyWindow( hWnd );
+        return 1;
+      default:
+        break;
+      }
+    }
+    break;
   case PWM_INIT:
     {
       OutputDebugString(TEXT("PWM_INIT\n"));
-      PostMessage( hWnd , PWM_SUPRESS_SUSPEND , 0 , 0 );
+      PostMessage( hWnd , PWM_SUPPRESS_SUSPEND , 0 , 0 );
       
     }
     return 1;
-  case PWM_SUPRESS_SUSPEND:
+  case PWM_SUPPRESS_SUSPEND:
     {
-      OutputDebugString(TEXT("PWM_SUPRESS_SUSPEND\n"));
+      OutputDebugString(TEXT("PWM_SUPPRESS_SUSPEND\n"));
+      if( ! SetThreadExecutionState(ES_AWAYMODE_REQUIRED | ES_CONTINUOUS) ){
+        MessageBox( hWnd, TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
+      }
     }
-    return 1;
-  case PWM_SUPRESS_SCREENSAVER:
+    return 0;
+  case PWM_SUPPRESS_SCREENSAVER:
     {
-      OutputDebugString(TEXT("PWM_SUPRESS_SCREENSAVER\n"));
+      OutputDebugString(TEXT("PWM_SUPPRESS_SCREENSAVER\n"));
+      if( ! SetThreadExecutionState( ES_DISPLAY_REQUIRED | ES_CONTINUOUS )){
+        MessageBox( hWnd, TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
+      }
     }
-    return 1;
+    return 0;
   case PWM_SHUTDOWN:
     {
       OutputDebugString(TEXT("PWM_SHUTDOWN\n"));
+      if( ! SetThreadExecutionState( ES_CONTINUOUS ) ){
+        MessageBox( hWnd, TEXT("失敗" ), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
+      }
     }
-    return 1;
+    return 0;
   case PWM_TASKTRAY:
     {
       OutputDebugString( TEXT("PWM_TASKTRAY") );
@@ -109,14 +167,15 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
       case WM_CONTEXTMENU:
         {
           POINT const pt = { LOWORD( wParam ) , HIWORD( wParam ) };
-          (void)(pt);
+          ShowContextMenu( GetModuleHandle( NULL ) , hWnd , pt );
         }
         break;
       default:
         break;
       }
     }
-    break;
+    return 0;
+    
   case WM_CREATE:
     {
       OutputDebugString(TEXT("WM_CREATE\n"));
@@ -138,6 +197,7 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
     VERIFY( DestroyWindow( hWnd ) );
     return 0;
   case WM_DESTROY:
+    SendMessage( hWnd, PWM_SHUTDOWN , 0 , 0 );
     VERIFY( DeleteNotificationIcon() );
     PostQuitMessage( 0 );
     break;
@@ -235,8 +295,11 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
                               CW_USEDEFAULT,CW_USEDEFAULT,
                               300,200, NULL ,NULL , hInstance , static_cast<PVOID>(&arg) );
     if( hWnd ){
-      ShowWindow( hWnd , nCmdShow );
-      UpdateWindow( hWnd );
+      /*
+        ShowWindow( hWnd , nCmdShow );
+        UpdateWindow( hWnd );
+      */
+      
       BOOL bRet;
       MSG msg = { 0 };
       while(static_cast<bool>((bRet = GetMessage(&msg , NULL , 0 ,0  ) ) )){

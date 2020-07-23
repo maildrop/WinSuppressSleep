@@ -12,7 +12,7 @@
 #define IDI_SMALL                       108
 #define IDC_THREADEXEC                  109
 #define IDR_MAINFRAME                   128
-#define IDR_CONTEXTMENU                 129
+#define IDC_CONTEXTMENU                 129
 #define IDM_PROPERTY                    32774
 #define IDM_SUPRESS_SCREENSAVER         32776
 #define IDM_SUPRESS_SLEEP               32777
