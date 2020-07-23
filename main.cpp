@@ -85,7 +85,11 @@ static void ShowContextMenu( HINSTANCE hInstance, HWND hWnd ,const POINT& pt )
     HMENU hSubMenu = GetSubMenu( hMenu , 0 );
     assert( hSubMenu );
     if( hSubMenu ){
-      //SetForegroundWindow(hWnd);
+      SetForegroundWindow(hWnd);
+      /*
+        ここで SetForegroundWindow(hWnd) しておくのは、コンテキストメニュー以外の場所をクリックした時に、
+        コンテキストメニューが閉じる動作をするため。 hWnd自体が、表示されているかどうかはまた別の問題
+       */
       // respect menu drop alignment
       UINT uFlags = TPM_RIGHTBUTTON;
       if (GetSystemMetrics(SM_MENUDROPALIGNMENT) != 0){
@@ -288,10 +292,9 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
                               CW_USEDEFAULT,CW_USEDEFAULT,
                               300,200, NULL ,NULL , hInstance , static_cast<PVOID>(&arg) );
     if( hWnd ){
-      /*
-        ShowWindow( hWnd , nCmdShow );
-        UpdateWindow( hWnd );
-      */
+
+      //ShowWindow( hWnd , nCmdShow );
+      //UpdateWindow( hWnd );
       
       BOOL bRet;
       MSG msg = { 0 };
