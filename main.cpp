@@ -98,7 +98,36 @@ static void ShowContextMenu( HINSTANCE hInstance, HWND hWnd ,const POINT& pt )
       }else{
         uFlags |= TPM_LEFTALIGN;
       }
-      TrackPopupMenuEx(hSubMenu, uFlags, pt.x, pt.y, hWnd, NULL);      
+
+      MENUITEMINFO menuItemInfo = {
+        .cbSize = sizeof( MENUITEMINFO ) ,
+        .fMask  = MIIM_STATE };
+      
+      switch( (uintptr_t)GetProp( hWnd, TEXT("State") ) ){
+      case PWM_SUPPRESS_SUSPEND:
+        if( GetMenuItemInfo( hSubMenu , IDM_SUPRESS_SLEEP , FALSE , &menuItemInfo ) ){
+          menuItemInfo.fState |= MFS_CHECKED;
+          VERIFY( SetMenuItemInfo( hSubMenu , IDM_SUPRESS_SLEEP , FALSE , &menuItemInfo ));
+        }
+        break;
+      case PWM_SUPPRESS_SCREENSAVER:
+        if( GetMenuItemInfo( hSubMenu , IDM_SUPRESS_SCREENSAVER , FALSE , &menuItemInfo )){
+          menuItemInfo.fState |= MFS_CHECKED;
+          VERIFY( SetMenuItemInfo( hSubMenu , IDM_SUPRESS_SCREENSAVER , FALSE , &menuItemInfo ));
+        }
+        break;
+      case PWM_USER_PRESET:
+        if( GetMenuItemInfo( hSubMenu , IDM_USER_PRESET , FALSE , &menuItemInfo ) ){
+          menuItemInfo.fState |= MFS_CHECKED ;
+          VERIFY( SetMenuItemInfo( hSubMenu , IDM_USER_PRESET , FALSE , &menuItemInfo ));
+        }
+        break;
+      default:
+        break;
+      }
+
+      VERIFY( TrackPopupMenuEx(hSubMenu, uFlags, pt.x, pt.y, hWnd, NULL) );
+
     }
     DestroyMenu( hMenu );
   }
@@ -140,32 +169,38 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
   case PWM_INIT:
     {
       TRACEER( TEXT("PWM_INIT") );
-      PostMessage( hWnd , PWM_SUPPRESS_SUSPEND , 0 , 0 );
+      SendMessage( hWnd , PWM_SUPPRESS_SUSPEND , 0 , 0 );
     }
     return 1;
   case PWM_SUPPRESS_SUSPEND:
-    {
+    do{
       TRACEER( TEXT("PWM_SUPPRESS_SUSPEND"));
       if( ! SetThreadExecutionState( ES_AWAYMODE_REQUIRED | ES_CONTINUOUS) ){
         MessageBox( hWnd, TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
+        break;
       }
-    }
+      VERIFY(SetProp( hWnd , TEXT("State") , (HANDLE)(PWM_SUPPRESS_SUSPEND)));
+    }while( false );
     return 1;
   case PWM_SUPPRESS_SCREENSAVER:
-    {
+    do{
       TRACEER( TEXT("PWM_SUPPRESS_SCREENSAVER") );
       if( ! SetThreadExecutionState( ES_DISPLAY_REQUIRED | ES_CONTINUOUS )){
         MessageBox( hWnd, TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
+        break;
       }
-    }
+      VERIFY(SetProp( hWnd , TEXT("State") , (HANDLE)(PWM_SUPPRESS_SCREENSAVER)));
+    }while( false );
     return 1;
   case PWM_USER_PRESET:
-    {
+    do{
       TRACEER( TEXT("PWM_USER_PRESET") );
       if( ! SetThreadExecutionState( ES_CONTINUOUS ) ){
         MessageBox( hWnd , TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
+        break;
       }
-    }
+      VERIFY(SetProp( hWnd , TEXT("State") , (HANDLE)(PWM_USER_PRESET)));
+    }while( false );
     return 1;
   case PWM_SHUTDOWN:
     {
