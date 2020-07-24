@@ -2,6 +2,9 @@
 Temporal suppress power sleep mode in Windows App  
 GNU GENERAL PUBLIC LICENSE version 3.0 or later.
 
+
+![screenshot](https://raw.githubusercontent.com/maildrop/WinSuppressSleep/master/resources/project-desc.jpg "screenshot")
+
 # How to Build
 use nmake
 
