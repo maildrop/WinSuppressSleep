@@ -30,6 +30,7 @@ extern "C"{
     PWM_INIT,
     PWM_SUPPRESS_SUSPEND,
     PWM_SUPPRESS_SCREENSAVER,
+    PWM_USER_PRESET,
     PWM_SHUTDOWN,
     PWM_LAST
   };
@@ -123,6 +124,14 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
       case IDM_EXIT:
         DestroyWindow( hWnd );
         return 1;
+      case IDM_SUPRESS_SLEEP:
+        PostMessage( hWnd , PWM_SUPPRESS_SUSPEND , 0, 0 );
+        return 1;
+      case IDM_SUPRESS_SCREENSAVER:
+        PostMessage( hWnd , PWM_SUPPRESS_SCREENSAVER , 0 , 0);
+        return 1;
+      case IDM_USER_PRESET:
+        PostMessage( hWnd , PWM_USER_PRESET , 0 ,0 );
       default:
         break;
       }
@@ -141,7 +150,7 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
         MessageBox( hWnd, TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
       }
     }
-    return 0;
+    return 1;
   case PWM_SUPPRESS_SCREENSAVER:
     {
       TRACEER( TEXT("PWM_SUPPRESS_SCREENSAVER") );
@@ -149,7 +158,15 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
         MessageBox( hWnd, TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
       }
     }
-    return 0;
+    return 1;
+  case PWM_USER_PRESET:
+    {
+      TRACEER( TEXT("PWM_USER_PRESET") );
+      if( ! SetThreadExecutionState( ES_CONTINUOUS ) ){
+        MessageBox( hWnd , TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
+      }
+    }
+    return 1;
   case PWM_SHUTDOWN:
     {
       TRACEER( TEXT("PWM_SHUTDOWN") );
