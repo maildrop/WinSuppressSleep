@@ -175,7 +175,7 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
   case PWM_SUPPRESS_SUSPEND:
     do{
       TRACEER( TEXT("PWM_SUPPRESS_SUSPEND"));
-      if( ! SetThreadExecutionState( ES_AWAYMODE_REQUIRED | ES_CONTINUOUS) ){
+      if( ! SetThreadExecutionState( ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED) ){
         MessageBox( hWnd, TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
         break;
       }
@@ -185,7 +185,7 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
   case PWM_SUPPRESS_SCREENSAVER:
     do{
       TRACEER( TEXT("PWM_SUPPRESS_SCREENSAVER") );
-      if( ! SetThreadExecutionState( ES_DISPLAY_REQUIRED | ES_CONTINUOUS )){
+      if( ! SetThreadExecutionState( ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED )){
         MessageBox( hWnd, TEXT("失敗"), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
         break;
       }
