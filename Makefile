@@ -3,7 +3,7 @@
 #
 
 CXX=cl.exe
-CXXFLAGS=-nologo -W4 -WX -Zi -DEBUG:FASTLINK -EHsc -std:c++latest -DUNICODE=1 -D_UNICODE=1 -DNDEBUG=1 -MD 
+CXXFLAGS=-nologo -W4 -WX -Zi -O1 -DEBUG:FASTLINK -EHsc -std:c++latest -DUNICODE=1 -D_UNICODE=1 -MDd 
 LINK=link.exe
 LINKFLAGS=-nologo -DEBUG /MANIFEST
 RC=rc.exe
