@@ -1,15 +1,18 @@
-﻿
+﻿#
+#
+#
+
 CXX=cl.exe
-CXXFLAGS=-nologo -W4 -Zi -DEBUG:FASTLINK -EHsc -std:c++latest -DUNICODE=1 -D_UNICODE=1 -MDd
+CXXFLAGS=-nologo -W4 -WX -Zi -DEBUG:FASTLINK -EHsc -std:c++latest -DUNICODE=1 -D_UNICODE=1 -DNDEBUG=1 -MD 
 LINK=link.exe
-LINKFLAGS=-nologo -DEBUG
+LINKFLAGS=-nologo -DEBUG /MANIFEST
 RC=rc.exe
 
-threadexec_OBJS=main.obj threadexec.res vc???.pdb
-clean_TAREGET=$(threadexec_OBJS) threadexec.exe threadexec.ilk threadexec.pdb
+threadexec_OBJS=main.obj threadexec.res 
+clean_TAREGET=$(threadexec_OBJS) threadexec.exe threadexec.ilk threadexec.pdb vc???.pdb
 
-threadexec.exe: main.obj threadexec.res
-	$(LINK) $(LINKFLAGS) /OUT:$@ $**
+threadexec.exe: $(threadexec_OBJS) manifest.xml
+	$(LINK) $(LINKFLAGS) /MANIFEST:EMBED /MANIFESTINPUT:manifest.xml /OUT:$@ $(threadexec_OBJS)
 
 main.obj: main.cpp Resource.h traceer.h
 	$(CXX) -c $(CXXFLAGS) -Fo:$@ $*.cpp
