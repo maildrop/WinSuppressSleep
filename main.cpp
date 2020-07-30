@@ -16,12 +16,8 @@
 #pragma comment(lib, "Ole32.lib" )
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "Shell32.lib")
-#pragma comment(linker,"/manifestdependency:\"type='win32' \
-name='Microsoft.Windows.Common-Controls' \
-version='6.0.0.0' \
-processorArchitecture='*' \
-publicKeyToken='6595b64144ccf1df' \
-language='*'\"")
+
+#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 extern "C"{
   /* Private Window Messages */
@@ -32,6 +28,7 @@ extern "C"{
     PWM_SUPPRESS_SCREENSAVER,
     PWM_USER_PRESET,
     PWM_SHUTDOWN,
+    PWM_SHUTDOWN_IMPL,
     PWM_LAST
   };
   struct CreateWindowArgument{
@@ -40,10 +37,11 @@ extern "C"{
   };
 }
 
-class __declspec( uuid("9c8dd510-7260-4928-86b4-19a14e5d9b94") ) ShellTasktrayIcon;
+class __declspec( uuid("7e1314e5-3d70-4445-89b1-25f2ff785722") ) ShellTasktrayIcon;
 
 static BOOL AddNotificationIcon( HWND hWnd );
 static BOOL DeleteNotificationIcon();
+static void ShowContextMenu( HINSTANCE hInstance, HWND hWnd ,const POINT& pt );
 static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam );
 
 static BOOL AddNotificationIcon( HWND hWnd )
@@ -52,17 +50,25 @@ static BOOL AddNotificationIcon( HWND hWnd )
   NOTIFYICONDATA nid = { 0 };
   nid.cbSize = sizeof( nid );
   nid.hWnd = hWnd;
-  nid.uID = 0;
-  nid.uFlags = NIF_GUID | NIF_MESSAGE  ;
+  nid.uFlags = NIF_GUID | NIF_MESSAGE | NIF_ICON ;
+  {
+    nid.guidItem = __uuidof( ShellTasktrayIcon );
+    nid.uFlags |= NIF_GUID;
+  }
+  {
+    nid.uCallbackMessage = PWM_TASKTRAY;
+    nid.uFlags |= NIF_MESSAGE;
+  }
+  
   if( S_OK == LoadIconMetric( GetModuleHandle( NULL ),MAKEINTRESOURCE( IDI_THREADEXEC ) , LIM_SMALL, &nid.hIcon ) ){
     nid.uFlags |= NIF_ICON;
   }
-  nid.uCallbackMessage = PWM_TASKTRAY;
-  nid.guidItem = __uuidof( ShellTasktrayIcon );
+
   if( Shell_NotifyIcon(NIM_ADD, &nid) ){
     nid.uVersion = NOTIFYICON_VERSION_4;
     return Shell_NotifyIcon(NIM_SETVERSION, &nid );
   }else{
+    assert(!"Shell_NotifyIcon( NIM_ADD, &nid) failed" );
     return FALSE;
   }
 }
@@ -80,17 +86,15 @@ static BOOL DeleteNotificationIcon()
 
 static void ShowContextMenu( HINSTANCE hInstance, HWND hWnd ,const POINT& pt )
 {
+  // この hInstance は、Windowクラスの hInstance と同じ 
+  assert( hInstance == reinterpret_cast<HINSTANCE>( GetWindowLongPtr( hWnd , GWLP_HINSTANCE ) ));
   HMENU hMenu = LoadMenu( hInstance , MAKEINTRESOURCE( IDC_CONTEXTMENU ) );
   assert( hMenu );
   if( hMenu ){
     HMENU hSubMenu = GetSubMenu( hMenu , 0 );
     assert( hSubMenu );
     if( hSubMenu ){
-      SetForegroundWindow(hWnd);
-      /*
-        ここで SetForegroundWindow(hWnd) しておくのは、コンテキストメニュー以外の場所をクリックした時に、
-        コンテキストメニューが閉じる動作をするため。 hWnd自体が、表示されているかどうかはまた別の問題
-       */
+
       // respect menu drop alignment
       UINT uFlags = TPM_RIGHTBUTTON;
       if (GetSystemMetrics(SM_MENUDROPALIGNMENT) != 0){
@@ -105,18 +109,21 @@ static void ShowContextMenu( HINSTANCE hInstance, HWND hWnd ,const POINT& pt )
       
       switch( (uintptr_t)GetProp( hWnd, TEXT("State") ) ){
       case PWM_SUPPRESS_SUSPEND:
+        menuItemInfo.fState = 0;
         if( GetMenuItemInfo( hSubMenu , IDM_SUPRESS_SLEEP , FALSE , &menuItemInfo ) ){
           menuItemInfo.fState |= MFS_CHECKED;
           VERIFY( SetMenuItemInfo( hSubMenu , IDM_SUPRESS_SLEEP , FALSE , &menuItemInfo ));
         }
         break;
       case PWM_SUPPRESS_SCREENSAVER:
+        menuItemInfo.fState = 0;
         if( GetMenuItemInfo( hSubMenu , IDM_SUPRESS_SCREENSAVER , FALSE , &menuItemInfo )){
           menuItemInfo.fState |= MFS_CHECKED;
           VERIFY( SetMenuItemInfo( hSubMenu , IDM_SUPRESS_SCREENSAVER , FALSE , &menuItemInfo ));
         }
         break;
       case PWM_USER_PRESET:
+        menuItemInfo.fState = 0;
         if( GetMenuItemInfo( hSubMenu , IDM_USER_PRESET , FALSE , &menuItemInfo ) ){
           menuItemInfo.fState |= MFS_CHECKED ;
           VERIFY( SetMenuItemInfo( hSubMenu , IDM_USER_PRESET , FALSE , &menuItemInfo ));
@@ -126,14 +133,17 @@ static void ShowContextMenu( HINSTANCE hInstance, HWND hWnd ,const POINT& pt )
         break;
       }
 
+      /*
+        ここで SetForegroundWindow(hWnd) しておくのは、コンテキストメニュー以外の場所をクリックした時に、
+        コンテキストメニューが閉じる動作をするため。 hWnd自体が、表示されているかどうかはまた別の問題
+       */
+      (void)(SetForegroundWindow(hWnd));
       VERIFY( TrackPopupMenuEx(hSubMenu, uFlags, pt.x, pt.y, hWnd, NULL) );
-
     }
     DestroyMenu( hMenu );
   }
   return;
 }
-
 
 static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
 {
@@ -151,7 +161,7 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
       const int wmId = LOWORD( wParam );
       switch( wmId ){
       case IDM_EXIT:
-        DestroyWindow( hWnd );
+        SendMessage( hWnd, PWM_SHUTDOWN , 0 , 0 ); // ウィンドウを閉じる
         return 1;
       case IDM_SUPRESS_SLEEP:
         PostMessage( hWnd , PWM_SUPPRESS_SUSPEND , 0, 0 );
@@ -170,6 +180,9 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
     {
       TRACEER( TEXT("PWM_INIT") );
       SendMessage( hWnd , PWM_SUPPRESS_SUSPEND , 0 , 0 );
+      if(! AddNotificationIcon( hWnd ) ){
+        PostMessage( hWnd , PWM_SHUTDOWN_IMPL , 0 , 0);
+      }
     }
     return 1;
   case PWM_SUPPRESS_SUSPEND:
@@ -205,9 +218,16 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
   case PWM_SHUTDOWN:
     {
       TRACEER( TEXT("PWM_SHUTDOWN") );
+      VERIFY( DeleteNotificationIcon() ); // アイコンを消して
+    }
+    // tear down 
+  case PWM_SHUTDOWN_IMPL:
+    {
+      TRACEER( TEXT("PWM_SHUTDOWN_IMPL") );
       if( ! SetThreadExecutionState( ES_CONTINUOUS ) ){
         MessageBox( hWnd, TEXT("失敗" ), TEXT("ERROR") , MB_OK | MB_ICONWARNING );
       }
+      DestroyWindow( hWnd );
     }
     return 0;
   case PWM_TASKTRAY:
@@ -217,7 +237,7 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
       case WM_CONTEXTMENU:
         {
           POINT const pt = { LOWORD( wParam ) , HIWORD( wParam ) };
-          ShowContextMenu( GetModuleHandle( NULL ) , hWnd , pt );
+          ShowContextMenu( reinterpret_cast<HINSTANCE>(GetWindowLongPtr( hWnd , GWLP_HINSTANCE )) , hWnd , pt );
         }
         break;
       default:
@@ -227,27 +247,29 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
     return 0;
     
   case WM_CREATE:
-    {
+    do{
       TRACEER( TEXT("WM_CREATE"));
-      if( lParam ){
-        const CREATESTRUCT* createStruct = reinterpret_cast<CREATESTRUCT*>( lParam );
-        assert( createStruct );
-        if( createStruct->lpCreateParams ){
-          const CreateWindowArgument* arg = reinterpret_cast<CreateWindowArgument*>(createStruct->lpCreateParams);
-          if( arg ){
-            VERIFY( AddNotificationIcon( hWnd ) );
-          }
-        }
+      if(! lParam ){
+        goto HAS_ERROR;
       }
+      const CREATESTRUCT* createStruct = reinterpret_cast<CREATESTRUCT*>( lParam );
+      assert( createStruct );
+      if( !createStruct->lpCreateParams ){
+        goto HAS_ERROR;
+      }
+      const CreateWindowArgument* arg = reinterpret_cast<CreateWindowArgument*>(createStruct->lpCreateParams);
+      if(! arg ){
+        goto HAS_ERROR;
+      }
+
       VERIFY( PostMessage( hWnd, PWM_INIT , 0 ,0 ) );
-    }
+      
+      break;
+    HAS_ERROR:
+      return -1;
+    }while( false );
     break;
-  case WM_CLOSE:
-    VERIFY( DestroyWindow( hWnd ) );
-    return 0;
   case WM_DESTROY:
-    SendMessage( hWnd, PWM_SHUTDOWN , 0 , 0 );
-    VERIFY( DeleteNotificationIcon() );
     PostQuitMessage( 0 );
     break;
   default:
@@ -255,8 +277,6 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
   }
   return ::DefWindowProc( hWnd, msg , wParam  , lParam );
 }
-
-
 
 int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow )
 {
@@ -274,12 +294,11 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
     {
       ::CoUninitialize();
     }
-  };
-  
-  CoUnInitializeRAII raii{};
+  } raii{};
   
   std::thread entry(std::bind([]( HINSTANCE hInstance , PWSTR lpCmdLine, int nCmdShow ){
     static_cast<void>( lpCmdLine );
+    static_cast<void>( nCmdShow );
     
     {
       HRESULT const hr = ::CoInitializeEx( NULL,  COINIT_MULTITHREADED );
