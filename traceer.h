@@ -35,7 +35,7 @@ namespace traceer{
   {
     char buf[512] = {0};
     do{
-      _snprintf_s(buf, _TRUNCATE, fmt, std::forward<Args...>(args)... );
+      _snprintf_s(buf, _TRUNCATE, fmt, std::forward<Args>(args)... );
       strcat_s( buf , line );
       OutputDebugStringA( buf );
     }while( false );
@@ -58,7 +58,7 @@ namespace traceer{
   {
     wchar_t buf[512] = {0};
     do{
-      _snwprintf_s( buf ,_TRUNCATE, fmt , std::forward<Args...>( args )... );
+      _snwprintf_s( buf ,_TRUNCATE, fmt , std::forward<Args>( args )... );
       traceer( line , buf );
     }while( false );
     return 0;
