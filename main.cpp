@@ -46,9 +46,9 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam );
 
 static BOOL AddNotificationIcon( HWND hWnd )
 {
-  // TODO: 複数回アプリを立ち上げると、Shellのアイコン管理が上手くいかなくなるのでどうにかする
   NOTIFYICONDATA nid = { 0 };
   nid.cbSize = sizeof( nid );
+  nid.uVersion = NOTIFYICON_VERSION_4;
   nid.hWnd = hWnd;
   nid.uFlags = NIF_GUID | NIF_MESSAGE | NIF_ICON ;
   {
@@ -65,7 +65,6 @@ static BOOL AddNotificationIcon( HWND hWnd )
   }
 
   if( Shell_NotifyIcon(NIM_ADD, &nid) ){
-    nid.uVersion = NOTIFYICON_VERSION_4;
     return Shell_NotifyIcon(NIM_SETVERSION, &nid );
   }else{
     assert(!"Shell_NotifyIcon( NIM_ADD, &nid) failed" );
@@ -83,6 +82,47 @@ static BOOL DeleteNotificationIcon()
   return Shell_NotifyIcon(NIM_DELETE, &nid );
 }
 
+struct DecorateContextMenu{
+  const HWND hWnd;
+  DecorateContextMenu( HWND hWnd ) : hWnd( hWnd ){
+  };
+  BOOL operator()(HMENU hContextMenu) const 
+  {
+    (void)( hContextMenu );
+    return TRUE;
+  }
+};
+
+template<typename Decorator_t , int RESOURCE_MENU_ID, int RESOURCE_SUBMENU_ID = 0> 
+void ShowContextMenu(HWND hWnd , const POINT& pt ,const Decorator_t& dec)
+{
+  HINSTANCE const hInstance{ reinterpret_cast<HINSTANCE>(GetWindowLongPtr( hWnd , GWLP_HINSTANCE )) };
+  HMENU const hMenu = LoadMenu( hInstance , MAKEINTRESOURCE( RESOURCE_MENU_ID ) );
+  assert( hMenu );
+  if( hMenu ){
+    HMENU const hSubMenu = GetSubMenu( hMenu , RESOURCE_MENU_ID );
+    assert( hSubMenu );
+    if( hSubMenu ){
+
+      // コンテキストメニューの装飾を行う
+      VERIFY( dec( hSubMenu ) );
+
+      // ウィンドウを前面に持ってくる。このウィンドウがフォーカスを失ったときに（コンテキストメニュー以外にフォーカスが当たった時に）コンテキストメニューを閉じるため。
+      // そしてSetForegroundWindow は失敗することがあるが、特に気にしない。
+      (void)(SetForegroundWindow( hWnd )); 
+
+      // respect menu drop alignment
+      UINT uFlags = TPM_RIGHTBUTTON;
+      if (GetSystemMetrics(SM_MENUDROPALIGNMENT) != 0){
+        uFlags |= TPM_RIGHTALIGN;
+      }else{
+        uFlags |= TPM_LEFTALIGN;
+      }
+      VERIFY( TrackPopupMenuEx(hSubMenu, uFlags, pt.x, pt.y, hWnd, NULL) );
+    }
+  }
+  return;
+};
 
 static void ShowContextMenu( HINSTANCE hInstance, HWND hWnd ,const POINT& pt )
 {
@@ -272,6 +312,11 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
   case WM_DESTROY:
     PostQuitMessage( 0 );
     break;
+  case WM_DPICHANGED:
+    // DPI 変更がされました。
+    TRACEER( TEXT("WM_DPI_CHANGED( wParam HIWORD=%hu LOWORD=%hu )" ),
+             HIWORD( wParam ) , LOWORD( wParam ) );
+    return ::DefWindowProc( hWnd , msg , wParam , lParam );
   default:
     break;
   }
@@ -308,6 +353,9 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
       }
     }
 
+    
+
+    
     CoUnInitializeRAII raii{};
     HICON appIcon = // LoadIcon( hInstance , MAKEINTRESOURCE( IDI_THREADEXEC ));
       static_cast<HICON>( LoadImage( hInstance ,
@@ -363,7 +411,13 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
                               CW_USEDEFAULT,CW_USEDEFAULT,
                               300,200, NULL ,NULL , hInstance , static_cast<PVOID>(&arg) );
     if( hWnd ){
-
+#if 0
+      // High DPI に対応するために
+      TRACEER( TEXT("GetDpiForWindow() = %u"),GetDpiForWindow( hWnd ) );
+      TRACEER( TEXT("SM_CXICON = %u, SM_CYICON = %u"),
+               GetSystemMetricsForDpi( SM_CXICON , GetDpiForWindow( hWnd ) ),
+               GetSystemMetricsForDpi( SM_CYICON , GetDpiForWindow( hWnd ) ));
+#endif /* 0 */
       //ShowWindow( hWnd , nCmdShow );
       //UpdateWindow( hWnd );
       
