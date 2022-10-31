@@ -292,16 +292,21 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
       if(! lParam ){
         goto HAS_ERROR;
       }
-      const CREATESTRUCT* createStruct = reinterpret_cast<CREATESTRUCT*>( lParam );
-      assert( createStruct );
-      if( !createStruct->lpCreateParams ){
-        goto HAS_ERROR;
-      }
-      const CreateWindowArgument* arg = reinterpret_cast<CreateWindowArgument*>(createStruct->lpCreateParams);
-      if(! arg ){
-        goto HAS_ERROR;
-      }
 
+      {
+        const CREATESTRUCT* createStruct = reinterpret_cast<CREATESTRUCT*>( lParam );
+        assert( createStruct );
+        if( !createStruct->lpCreateParams ){
+          goto HAS_ERROR;
+        }
+      
+        {
+          const CreateWindowArgument* arg = reinterpret_cast<CreateWindowArgument*>(createStruct->lpCreateParams);
+          if(! arg ){
+            goto HAS_ERROR;
+          }
+        }
+      }
       VERIFY( PostMessage( hWnd, PWM_INIT , 0 ,0 ) );
       
       break;
