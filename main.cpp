@@ -1,5 +1,6 @@
 ﻿#include "Resource.h"
 #include <iostream>
+#include <locale>
 #include <functional>
 #include <thread>
 #include <cassert>
@@ -330,6 +331,8 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
 
 int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow )
 {
+  std::locale::global( std::locale(""));
+  
   {
     HRESULT const hr = ::CoInitializeEx( NULL , COINIT_MULTITHREADED );
     assert( S_OK == hr );
@@ -357,9 +360,6 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
         return 3;
       }
     }
-
-    
-
     
     CoUnInitializeRAII raii{};
     HICON appIcon = // LoadIcon( hInstance , MAKEINTRESOURCE( IDI_THREADEXEC ));
@@ -439,6 +439,7 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
     }
     return EXIT_SUCCESS;
   }, hInstance,lpCmdLine,nCmdShow ));
+
   entry.join();
   return EXIT_SUCCESS;
 }
