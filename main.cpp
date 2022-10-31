@@ -331,8 +331,17 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
 
 int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow )
 {
+  struct CoUnInitializeRAII{
+    CoUnInitializeRAII(){}
+    ~CoUnInitializeRAII()
+    {
+      ::CoUninitialize();
+    }
+  };
+
   std::locale::global( std::locale(""));
-  
+
+  /* CoInitializeEx and CoUninitialize */
   {
     HRESULT const hr = ::CoInitializeEx( NULL , COINIT_MULTITHREADED );
     assert( S_OK == hr );
@@ -340,15 +349,10 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
       return 3;
     }
   }
-
-  struct CoUnInitializeRAII{
-    CoUnInitializeRAII(){}
-    ~CoUnInitializeRAII()
-    {
-      ::CoUninitialize();
-    }
-  } raii{};
+  struct CoUnInitializeRAII raii{};
   
+
+  /* entry point */
   std::thread entry(std::bind([]( HINSTANCE hInstance , PWSTR lpCmdLine, int nCmdShow ){
     static_cast<void>( lpCmdLine );
     static_cast<void>( nCmdShow );
@@ -415,23 +419,28 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
                               WS_OVERLAPPEDWINDOW ,
                               CW_USEDEFAULT,CW_USEDEFAULT,
                               300,200, NULL ,NULL , hInstance , static_cast<PVOID>(&arg) );
-    if( hWnd ){
+    if( !hWnd ){
+      return 1;
+    }
+    
 #if 0
+    {
       // High DPI に対応するために
       TRACEER( TEXT("GetDpiForWindow() = %u"),GetDpiForWindow( hWnd ) );
       TRACEER( TEXT("SM_CXICON = %u, SM_CYICON = %u"),
                GetSystemMetricsForDpi( SM_CXICON , GetDpiForWindow( hWnd ) ),
                GetSystemMetricsForDpi( SM_CYICON , GetDpiForWindow( hWnd ) ));
+      // ShowWindow( hWnd , nCmdShow );
+      // UpdateWindow( hWnd );
+    }
 #endif /* 0 */
-      //ShowWindow( hWnd , nCmdShow );
-      //UpdateWindow( hWnd );
-      
+    {
       BOOL bRet;
       MSG msg = { 0 };
       while(static_cast<bool>((bRet = GetMessage(&msg , NULL , 0 ,0  ) ) )){
         if( -1 == bRet ){
           break;
-        }else{
+          }else{
           TranslateMessage( &msg );
           DispatchMessage( &msg );
         }
