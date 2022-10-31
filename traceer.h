@@ -30,17 +30,7 @@
 #endif /* !defined( TRACEER ) */
 
 namespace traceer{
-  template<size_t n,typename ... Args>
-  static inline int traceer( const char (&line)[n], const char* fmt , Args&& ... args )
-  {
-    char buf[512] = {0};
-    do{
-      _snprintf_s(buf, _TRUNCATE, fmt, std::forward<Args>(args)... );
-      strcat_s( buf , line );
-      OutputDebugStringA( buf );
-    }while( false );
-    return 0;
-  }
+
   template<size_t n>
   static inline int traceer( const char (&line)[n], const char* fmt )
   {
@@ -52,7 +42,30 @@ namespace traceer{
     }while( false );
     return 0;
   }
+
+  template<size_t n,typename ... Args>
+  static inline int traceer( const char (&line)[n], const char* fmt , Args&& ... args )
+  {
+    char buf[512] = {0};
+    do{
+      _snprintf_s(buf, _TRUNCATE, fmt, std::forward<Args>(args)... );
+      strcat_s( buf , line );
+      OutputDebugStringA( buf );
+    }while( false );
+    return 0;
+  }
   
+  template<size_t n>
+  static inline int traceer( const char (&line)[n], const wchar_t* fmt )
+  {
+    wchar_t buf[512] = {0};
+    do{
+      _snwprintf_s( buf , _TRUNCATE , L"%s%S", fmt , line);
+      OutputDebugStringW( buf );
+    }while( false );
+    return 0;
+  }
+
   template<size_t n,typename ... Args>
   static inline int traceer( const char (&line)[n], const wchar_t* fmt , Args&& ... args )
   {
@@ -60,17 +73,6 @@ namespace traceer{
     do{
       _snwprintf_s( buf ,_TRUNCATE, fmt , std::forward<Args>( args )... );
       traceer( line , buf );
-    }while( false );
-    return 0;
-  }
-
-  template<size_t n, typename ... Args>
-  static inline int traceer( const char (&line)[n], const wchar_t* fmt )
-  {
-    wchar_t buf[512] = {0};
-    do{
-      _snwprintf_s( buf , _TRUNCATE , L"%s%S", fmt , line);
-      OutputDebugStringW( buf );
     }while( false );
     return 0;
   }
