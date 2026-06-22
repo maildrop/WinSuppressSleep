@@ -3,6 +3,7 @@
 #include <locale>
 #include <functional>
 #include <thread>
+#include <tuple>
 #include <cassert>
 
 #include <tchar.h>
@@ -41,7 +42,7 @@ extern "C"{
 class __declspec( uuid("7e1314e5-3d70-4445-89b1-25f2ff785722") ) ShellTasktrayIcon;
 
 static BOOL AddNotificationIcon( HWND hWnd );
-static BOOL DeleteNotificationIcon();
+static BOOL DeleteNotificationIcon(void);
 static void ShowContextMenu( HINSTANCE hInstance, HWND hWnd ,const POINT& pt );
 static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam );
 
@@ -73,7 +74,7 @@ static BOOL AddNotificationIcon( HWND hWnd )
   }
 }
 
-static BOOL DeleteNotificationIcon()
+static BOOL DeleteNotificationIcon(void)
 {
   NOTIFYICONDATA nid = { 0 };
   nid.cbSize = sizeof( nid );
@@ -331,13 +332,6 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
 
 int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow )
 {
-  struct CoUnInitializeRAII{
-    CoUnInitializeRAII(){}
-    ~CoUnInitializeRAII()
-    {
-      ::CoUninitialize();
-    }
-  };
 
   std::locale::global( std::locale(""));
 
@@ -349,16 +343,28 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
       return 3;
     }
   }
-  struct CoUnInitializeRAII raii{};
-  
+
+  struct CoUnInitializeRAII{
+    CoUnInitializeRAII(){}
+    ~CoUnInitializeRAII()
+    {
+      ::CoUninitialize();
+    }
+  } raii{};
 
   /* entry point */
-  std::thread entry(std::bind([]( HINSTANCE hInstance , PWSTR lpCmdLine, int nCmdShow ){
-    static_cast<void>( lpCmdLine );
-    static_cast<void>( nCmdShow );
+  std::thread entry(std::bind([]( HINSTANCE const hInstance , PWSTR const lpCmdLine, int const nCmdShow ){
+    std::ignore = lpCmdLine;
+    std::ignore = nCmdShow;
     
+    assert( hInstance );
+    if( !hInstance ){
+      return 1;
+    }
+
     {
-      HRESULT const hr = ::CoInitializeEx( NULL,  COINIT_MULTITHREADED );
+      /* このスレッドは、Window を作るので、COINIT_APARTMENTTHREADED と宣言する */
+      HRESULT const hr = ::CoInitializeEx( NULL,  COINIT_APARTMENTTHREADED  );
       assert( S_OK == hr );
       if(! SUCCEEDED( hr )){
         return 3;
@@ -366,6 +372,7 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
     }
     
     CoUnInitializeRAII raii{};
+
     HICON appIcon = // LoadIcon( hInstance , MAKEINTRESOURCE( IDI_THREADEXEC ));
       static_cast<HICON>( LoadImage( hInstance ,
                                      MAKEINTRESOURCE( IDI_THREADEXEC ),
@@ -373,7 +380,6 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
                                      GetSystemMetrics( SM_CXICON ),
                                      GetSystemMetrics( SM_CYICON ),
                                      LR_DEFAULTCOLOR ) );
-    assert( appIcon);
     
     HICON smIcon = // LoadIcon( hInstance , MAKEINTRESOURCE( IDI_SMALL ));
       static_cast<HICON>( LoadImage( hInstance ,
@@ -382,6 +388,9 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
                                      GetSystemMetrics( SM_CXSMICON ),
                                      GetSystemMetrics( SM_CYSMICON ),
                                      LR_DEFAULTCOLOR ) );
+
+    // 警告はするが、HICONが NULL でも動作には影響がないのでそのまま実行
+    assert( appIcon ); 
     assert( smIcon );
     
     const WNDCLASSEXW wndClass = {
@@ -398,11 +407,14 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
       .lpszClassName = TEXT("threadexecwnd"),
       .hIconSm = smIcon
     };
+    
     const ATOM atom = RegisterClassEx( &wndClass );
+
     assert( atom );
     if(! atom ){
       return EXIT_FAILURE;
     }
+    
     const struct ATOMRAII {
       ATOM atom ;
       HINSTANCE hInstance;
@@ -434,21 +446,22 @@ int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow 
       // UpdateWindow( hWnd );
     }
 #endif /* 0 */
+    
     {
       BOOL bRet;
       MSG msg = { 0 };
       while(static_cast<bool>((bRet = GetMessage(&msg , NULL , 0 ,0  ) ) )){
         if( -1 == bRet ){
           break;
-          }else{
-          TranslateMessage( &msg );
-          DispatchMessage( &msg );
         }
+        TranslateMessage( &msg );
+        DispatchMessage( &msg );
       }
     }
     return EXIT_SUCCESS;
   }, hInstance,lpCmdLine,nCmdShow ));
 
-  entry.join();
+  (void)entry.join();
+  
   return EXIT_SUCCESS;
 }
