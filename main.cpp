@@ -330,8 +330,105 @@ static LRESULT wndproc( HWND hWnd , UINT msg , WPARAM wParam , LPARAM lParam )
   return ::DefWindowProc( hWnd, msg , wParam  , lParam );
 }
 
+#if defined( __cplusplus )
+namespace wh{
+  namespace util{
+
+    /*
+      今、 SFINAE を使って CRTの機能である、_get_heap_handle() が使えるかどうかを判定したいのだが、
+      decltype( _get_heap_handle() ) とすると この部分は、template（の型引数）に依存しなくなるので、
+      即時コンパイルエラーになる。
+      このために、ダミーのパラメータパック引数 type_t を追加して、_get_heap_handle() をテンプレート型依存にする。
+      
+      使うときは
+      decltype( enable_get_heap_handle(nullptr) ) と、nullptrを引数に渡す
+      
+      _get_heap_handle() が存在しない環境の場合、このテンプレートはSFINAEで除去される。
+    */
+    template<typename ...type_t >
+    static auto enable_get_heap_handle( std::nullptr_t&&, type_t ...args )->
+      decltype( _get_heap_handle( args... ) , std::true_type{} );
+    static auto enable_get_heap_handle( ... )->std::false_type;
+
+    template <typename type_t>
+    struct CRTHeapEnableTerminateionOnCorruption{
+      inline
+      void operator()(){
+# if !defined( NDEBUG )
+        OutputDebugString(TEXT("disable HeapEnableTerminationOnCorruption\n"));
+# endif
+        return;
+      }
+    };
+    
+    template<>
+    struct CRTHeapEnableTerminateionOnCorruption<std::true_type>
+    {
+      inline
+      void operator()(){
+# if !defined( NDEBUG )
+        OutputDebugString(TEXT("enable HeapEnableTerminationOnCorruption\n"));
+# endif /* !defined( NDEBUG ) */
+        HANDLE const crtHeapHandle = reinterpret_cast<HANDLE>( _get_heap_handle()); 
+        VERIFY( crtHeapHandle != NULL );
+        if( crtHeapHandle ){
+          if( GetProcessHeap() == crtHeapHandle ){// CRT のバージョンによって ProcessHeap を直接使っていることがある。
+            // MSVC 201? あたりで変更されている。
+# if !defined( NDEBUG )
+            OutputDebugString(TEXT(" CRT uses ProcessHeap directly.\n" ));
+#endif /* !defined( NDEBUG ) */
+          }else{
+            VERIFY( HeapSetInformation(crtHeapHandle, HeapEnableTerminationOnCorruption, NULL, 0) );
+            
+            // 追加でLow-Fragmentation-Heap を使用するように指示する。
+            ULONG heapInformaiton(2L); // Low Fragmention Heap を指示
+            VERIFY( HeapSetInformation(crtHeapHandle, HeapCompatibilityInformation, 
+                                       &heapInformaiton, sizeof( heapInformaiton)));
+          }
+        }
+        return;
+      }
+    };
+  }
+}
+
+#endif /* defined( __cplusplus ) */
+
+
 int wWinMain( HINSTANCE hInstance  , HINSTANCE , PWSTR lpCmdLine , int nCmdShow )
 {
+  /**********************************
+   // まず、ヒープ破壊の検出で直ぐ死ぬように設定
+   ***********************************/
+    // HeapSetInformation() は Kernel32.dll 
+  { // プロセスヒープの破壊をチェック Kernel32.dll依存だが、これは KnownDLL
+    HANDLE processHeapHandle = ::GetProcessHeap(); // こちらの関数は、HANDLE が戻り値
+    VERIFY( processHeapHandle != NULL );
+    if( processHeapHandle ){
+      VERIFY( HeapSetInformation(processHeapHandle, HeapEnableTerminationOnCorruption, NULL, 0) );
+    }
+  }
+  
+  // 可能であれば、CRT Heap に対しても HeapEnableTerminationOnCorruption を設定する。
+  wh::util::CRTHeapEnableTerminateionOnCorruption<decltype(wh::util::enable_get_heap_handle(nullptr))>{}();
+  
+  /***************************************************
+  DLL の読み込み先から、カレントワーキングディレクトリの排除 
+  ***************************************************/
+  { 
+    /* DLL探索リストからカレントディレクトリの削除
+       http://codezine.jp/article/detail/5442?p=2  */
+    HMODULE kernel32ModuleHandle = GetModuleHandle( _T("kernel32")); // kernel32 は 実行中アンロードされないからこれでよし
+    if( NULL == kernel32ModuleHandle){
+      return 1;
+    }
+    FARPROC pFarProc = GetProcAddress( kernel32ModuleHandle , "SetDllDirectoryW");
+    if( NULL == pFarProc ){
+      return 1;
+    }
+    decltype(SetDllDirectoryW) *pSetDllDirectoryW(reinterpret_cast<decltype(SetDllDirectoryW)*>(pFarProc) );
+    VERIFY( 0 != pSetDllDirectoryW(L"") ); /* サーチパスからカレントワーキングディレクトリを排除する */
+  }
 
   std::locale::global( std::locale(""));
 
